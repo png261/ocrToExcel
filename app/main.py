@@ -1,26 +1,25 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import os, uuid, requests, base64, asyncio
 from dotenv import load_dotenv
-import gemini
-from excel_process import convert_history_json_to_excel_strict
-import s3
-import uvicorn
 
-# ---- Load config ----
+import uvicorn
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+import gemini
+import excel 
+import s3
+
 load_dotenv()
 
 
 PARSE_URL = os.getenv("PARSE_URL")
 OUTPUT_DIR = Path("output"); OUTPUT_DIR.mkdir(exist_ok=True)
 
-# ---- FastAPI app ----
 app = FastAPI(title="File to Excel API", description="API chuyển đổi file PDF/Images thành file Excel")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ---- Endpoint ----
 @app.post("/to_excel")
 async def file_to_excel(file: UploadFile = File(...)):
     name = Path(file.filename).stem
@@ -52,7 +51,7 @@ async def file_to_excel(file: UploadFile = File(...)):
 
         output_filename = f"{name}_{uuid.uuid4().hex[:8]}.xlsx"
         output_path = OUTPUT_DIR / output_filename
-        convert_history_json_to_excel_strict(data, image_urls_map, output_path)
+        excel.toExcel(data, image_urls_map, output_path)
         if not output_path.exists(): raise HTTPException(500, "Lỗi khi tạo file Excel")
 
         return FileResponse(output_path, filename=output_filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -60,7 +59,6 @@ async def file_to_excel(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"Lỗi server: {e}")
 
-# ---- Run server ----
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug")
 
