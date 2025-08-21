@@ -2,6 +2,7 @@ import google.generativeai as genai
 import json
 import re
 import os
+from base_prompt import get_prompt_van, get_prompt_kh
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -190,7 +191,7 @@ def fix_json_with_gemini(broken_json_string):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     
     fix_prompt = f"""
     Bạn là chuyên gia sửa lỗi JSON.
@@ -219,6 +220,7 @@ def fix_json_with_gemini(broken_json_string):
         part = response.candidates[0].content.parts[0]
         if hasattr(part, 'text') and isinstance(part.text, str):
             result_text = part.text
+            print("Gemini fix JSON response:", result_text[:200] + "...")
             
             # Tìm JSON trong response
             match = re.search(r"```json\s*([\s\S]+?)\s*```", result_text)
@@ -236,24 +238,27 @@ def fix_json_with_gemini(broken_json_string):
         print(f"Exception khi fix JSON: {e}")
         return None
 
-def markdownToJson(content):
+def call_gemini_api(content):
     from dotenv import load_dotenv
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     prompt = get_prompt(content)
     response = model.generate_content(prompt)
     try:
         part = response.candidates[0].content.parts[0]
         if hasattr(part, 'text') and isinstance(part.text, str):
             result_text = part.text
+            print("Gemini text:", result_text)
             match = re.search(r"```json\s*([\s\S]+?)\s*```", result_text)
             if match:
                 json_string = match.group(1)
             else:
+                # Loại bỏ mọi dấu ``` và khoảng trắng
                 json_string = result_text.replace('```json', '').replace('```', '').strip()
             
+            # Thử parse JSON
             try:
                 json_string = json_string.replace('“', '"').replace('”', '"').replace("’", "'")
                 return json.loads(json_string)
