@@ -1,95 +1,186 @@
+import os
+import json
+import google.generativeai as genai
+import re
+from pdf2image import convert_from_path
+import os
+import os
 import pandas as pd
+import json
 
-def toExcel(data, image_urls_map=None, output_path="output.xlsx"):
+def toExcel(data, image_urls_map=None, output_path="CÁCH MẠNG CÔNG NGHIỆP(NỬA SAU THẾ KỈ XVIII – GIỮA THẾ KỈ XIX).xlsx"):
     columns = [
-        'Câu hỏi', 'Loại câu hỏi', 'Độ khó (Mặc định: Nhận biết)', 'Trộn lựa chọn (Mặc định: Có)',
-        *[f"Lựa chọn {i}" for i in range(1, 11)],
-        'Đáp án', 'Đúng', 'Sai',
-        *[f"Vế {side} {i}" for i in range(1, 11) for side in ("trái", "phải")],
-        *[f"Cột {side} {i}" for i in range(1, 11) for side in ("trái", "phải")],
-        'Đáp án nối', 'Giải thích', "Ảnh minh họa"
-    ]
+    'Câu hỏi', 'Loại câu hỏi', 'Độ khó (Mặc định: Nhận biết)', 'Trộn lựa chọn (Mặc định: Có)',
+    *[f"Lựa chọn {i}" for i in range(1, 11)],
+    'Đáp án', 'Đúng', 'Sai',
+    # So le Vế trái - Vế phải
+    *[col for i in range(1, 11) for col in (f"Vế trái {i}", f"Vế phải {i}")],
+    *[f"Cột trái {i}" for i in range(1, 11)],
+    *[f"Cột phải {i}" for i in range(1, 11)],
+    'Đáp án nối', 'Giải thích', "Ảnh minh họa"
+]
 
-    header_desc = [f"({col})" for col in columns]
 
-    type_map = {
-        "multiple_choice": "Trắc nghiệm 1 đáp án (Multiple Choice)",
-        "checkbox": "Trắc nghiệm nhiều đáp án (Checkbox)",
-        "essay": "Tự luận (Essay)",
-        "fill_in_blank": "Điền khuyết (Fill In)",
-        "true_false": "Đúng sai (True False)",
-        "matching_single": "Nối 1 đáp án (Matching 1 answer)",
-        "matching_multiple": "Nối nhiều đáp án (Matching multi-answer)",
-        "ordering": "Sắp xếp (Order items)",
-        "image": "Ảnh minh họa (Image)"
+    header_descriptions = {
+        "Câu hỏi": "(Question)",
+        "Loại câu hỏi": "(Question type)",
+        "Độ khó (Mặc định: Nhận biết)": "(Difficulty level (Default: Remembering))",
+        "Trộn lựa chọn (Mặc định: Có)": "(Shuffle choice (Default: Yes))",
+        "Đáp án": "(Answers)",
+        "Đúng": "(True)",
+        "Sai": "(False)",
+        "Đáp án nối": "(Match answer)",
+        "Giải thích": "(Explain)",
+        "Ảnh minh họa": "(Image)"
     }
-
-    def safe_int(val, default=1):
-        try:
-            return int(val)
-        except (ValueError, TypeError):
-            return default
-
-    def get_choice_list(options, max_len=10):
-        return [options[i] if options and i < len(options) and options[i] else "lỗi không lấy được đáp án" for i in range(max_len)]
+    for i in range(1, 11):
+        header_descriptions[f"Lựa chọn {i}"] = f"(Choice {i})"
+        header_descriptions[f"Vế trái {i}"] = f"(Left Column {i})"
+        header_descriptions[f"Vế phải {i}"] = f"(Right Column {i})"
+        header_descriptions[f"Cột trái {i}"] = f"(Left column {i})"
+        header_descriptions[f"Cột phải {i}"] = f"(Right column {i})"
 
     rows = []
+
+    def get_type_label(qtype):
+        mapping = {
+            "multiple_choice": "Trắc nghiệm 1 đáp án (Multiple Choice)",
+            "checkbox": "Trắc nghiệm nhiều đáp án (Checkbox)",
+            "essay": "Tự luận (Essay)",
+            "fill_in_blank": "Điền khuyết (Fill In)",
+            "true_false": "Đúng sai (True False)",
+            "matching_single": "Nối 1 đáp án (Matching 1 answer)",
+            "matching_multiple": "Nối nhiều đáp án (Matching multi-answer)",
+            "ordering": "Sắp xếp (Order items)",
+            "Order items": "Sắp xếp (Order items)",
+            "Matching multi-answer": "Nối nhiều đáp án (Matching multi-answer)",
+            "Matching 1 answer": "Nối 1 đáp án (Matching 1 answer)",
+            "True False": "Đúng sai (True False)",
+            "Fill In": "Điền khuyết (Fill In)",
+            "Essay": "Tự luận (Essay)",
+            "Multiple Choice": "Trắc nghiệm 1 đáp án (Multiple Choice)",
+            "image": "Ảnh minh họa (Image)"
+        }
+        return mapping.get(qtype.strip(), qtype)
+
     for item in data:
-        qtype = item.get("Question type", "").strip()
-        row = [""] * len(columns)
+        row = {col: "" for col in columns}
+        row["Câu hỏi"] = item.get("Question", "")
+        row["Loại câu hỏi"] = get_type_label(item.get("Question type", ""))
+        row["Độ khó (Mặc định: Nhận biết)"] = item.get("Difficulty level", "Nhận biết (Remembering)")
+        row["Trộn lựa chọn (Mặc định: Có)"] = "Có (Yes)"
 
-        # Basic info
-        row[0] = item.get("Question", "")
-        row[1] = type_map.get(qtype, qtype)
-        row[2] = item.get("Difficulty level", "Nhận biết (Remembering)")
-        row[3] = "Có (Yes)"
-        row[-1] = image_urls_map.get(item.get("image", ""), item.get("image", "")) if image_urls_map else item.get("image", "")
+        img_key = item.get("image", "")
+        if image_urls_map and img_key in image_urls_map:
+            row["Ảnh minh họa"] = image_urls_map[img_key]
+        else:
+            row["Ảnh minh họa"] = img_key
+        
+        qtype = item.get("Question type")
 
-        if qtype in ("Multiple Choice", "multiple_choice"):
-            row[4:14] = get_choice_list(item.get("options", []), 10)
-            row[14] = safe_int(item.get("answer", 1))
-
-        elif qtype in ("Checkbox", "checkbox"):
-            row[4:14] = get_choice_list(item.get("options", []), 10)
-            answers = item.get("answer", [1,2,3])
-            row[14] = ",".join(map(str, answers))
-
-        elif qtype in ("True False", "true_false"):
-            statements = item.get("statements", [])
-            row[14] = ""  # Answers not needed
-            row[15] = ",".join(str(i+1) for i, s in enumerate(statements) if s.get("answer"))
-            row[16] = ",".join(str(i+1) for i, s in enumerate(statements) if not s.get("answer"))
-            for i, s in enumerate(statements):
-                if i < 10:
-                    row[4+i] = s.get("text", "")
-
-        elif qtype in ("Fill In", "fill_in_blank", "Essay", "essay"):
-            row[25] = ""  # Giải thích
-
-        elif qtype in ("Order items", "ordering"):
-            items_list = item.get("items", [])
-            for i, it in enumerate(items_list[:10]):
-                row[4+i] = it
-
-        elif qtype in ("Matching 1 answer", "Matching multi-answer", "matching_single", "matching_multiple"):
-            left, right = item.get("left", []), item.get("right", [])
-            if len(left) == len(right):
-                row[1] = "Nối 1 đáp án (Matching 1 answer)"
-                for i, (l,r) in enumerate(zip(left,right)):
-                    if i < 10:
-                        row[20 + 2*i] = l
-                        row[21 + 2*i] = r
+        if qtype == "Multiple Choice":
+            ab = item.get("answer", 1)
+            # Xử lý trường hợp ab là None hoặc empty string
+            if ab is None or ab == "":
+                row["Đáp án"] = 1
             else:
-                row[1] = "Nối nhiều đáp án (Matching multi-answer)"
-                for i, l in enumerate(left[:10]):
-                    row[40+i] = l
-                for i, r in enumerate(right[:10]):
-                    row[50+i] = r
+                try:
+                    row["Đáp án"] = int(ab)
+                except (ValueError, TypeError):
+                    row["Đáp án"] = 1
+            
+            options = item.get("options")
+            if not options:
+                for i in range(1, 5):
+                    row[f"Lựa chọn {i}"] = "lỗi không lấy được đáp án"
+            else:
+                for i, opt in enumerate(options):
+                    if opt:
+                        row[f"Lựa chọn {i+1}"] = opt
+                    else:
+                        for j in range(i+1, 5):
+                            row[f"Lựa chọn {j}"] = "lỗi không lấy được đáp án"
+                        break
+
+
+        if qtype == "Checkbox":
+            ab = ",".join(map(str, item.get("answer", [1, 2, 3])))
+            row["Loại câu hỏi"] = "Trắc nghiệm nhiều đáp án (Checkbox)"
+            # Xử lý trường hợp ab là None hoặc empty string
+            if ab is None or ab == "":
+                row["Đáp án"] = "1, 2, 3"
+            else:
+                try:
+                    row["Đáp án"] = ab
+                except (ValueError, TypeError):
+                    row["Đáp án"] = "1, 2, 3"
+            
+            options = item.get("options")
+            if not options:
+                for i in range(1, 5):
+                    row[f"Lựa chọn {i}"] = "lỗi không lấy được đáp án"
+            else:
+                for i, opt in enumerate(options):
+                    if opt:
+                        row[f"Lựa chọn {i+1}"] = opt
+                    else:
+                        for j in range(i+1, 5):
+                            row[f"Lựa chọn {j}"] = "lỗi không lấy được đáp án"
+                        break
+
+        elif qtype == "True False":
+            dung_list = []
+            sai_list = []
+            
+            for idx, statement in enumerate(item.get("statements", []), start=1):
+                if statement.get("answer", False):
+                    dung_list.append(str(idx))
+                else:
+                    sai_list.append(str(idx))
+            
+            row["Đúng"] = ",".join(dung_list)
+            row["Sai"] = ",".join(sai_list)
+
+            for i, st in enumerate(item.get("statements", [])):
+                row[f"Lựa chọn {i+1}"] = st["text"]
+
+        elif qtype == "Fill In":
+            # row["Giải thích"] = item.get("explanation", "")
+            row["Giải thích"] = ""
+
+        elif qtype == "Essay":
+            # row["Giải thích"] = item.get("explanation", "")
+            row["Giải thích"] = ""
+
+        elif qtype == "Order items":
+            
+            for i, item_text in enumerate(item.get("items", [])):
+                row[f"Lựa chọn {i+1}"] = item_text
+
+        elif qtype == "Matching 1 answer" or qtype == "Matching multi-answer":
+            if len(item.get("right", [])) == len(item.get("left", [])):
+                # print(len(item.get("right", [])), len(item.get("left", [])))
+                row["Loại câu hỏi"] = "Nối 1 đáp án (Matching 1 answer)"
+                for i, (left, right) in enumerate(zip(item.get("left", []), item.get("right", []))):
+                    row[f"Vế trái {i+1}"] = left
+                    row[f"Vế phải {i+1}"] = right
+            else:
+                row["Loại câu hỏi"] = "Nối nhiều đáp án (Matching multi-answer)"
+                for i, left in enumerate(item.get("left", [])):
+                    row[f"Cột trái {i+1}"] = left
+                for i, right in enumerate(item.get("right", [])):
+                    row[f"Cột phải {i+1}"] = right
             if "match" in item:
-                row[54] = "\\n".join(f"{k} -> {v}" for k,v in item["match"].items())
+                row["Đáp án nối"] = "\\n".join([f"{k} -> {v}" for k, v in item["match"].items()])
 
         rows.append(row)
 
-    df = pd.DataFrame([header_desc] + rows, columns=columns)
-    df.to_excel(output_path, index=False)
+    df = pd.DataFrame(rows, columns=columns)
+
+    df_with_header = pd.concat([
+        pd.DataFrame([header_descriptions], columns=columns),
+        df
+    ], ignore_index=True)
+
+    df_with_header.to_excel(output_path, index=False)
 
