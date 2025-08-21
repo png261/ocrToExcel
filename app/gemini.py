@@ -2,7 +2,6 @@ import google.generativeai as genai
 import json
 import re
 import os
-from base_prompt import get_prompt_van, get_prompt_kh
 from dotenv import load_dotenv
 
 load_dotenv()
