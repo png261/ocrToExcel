@@ -237,7 +237,7 @@ def fix_json_with_gemini(broken_json_string):
         print(f"Exception khi fix JSON: {e}")
         return None
 
-def call_gemini_api(content):
+def markdownToJson(content):
     from dotenv import load_dotenv
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
