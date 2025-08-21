@@ -42,7 +42,7 @@ def get_prompt(content):
   * `$\frac{1}{2}mv^2$` thay vì `½mv²`
   * `$$\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$` cho công thức phức tạp
 
-## 🔐 8 dạng bài tập cố định là:
+## 8 dạng bài tập cố định là:
 1. Trắc nghiệm 1 đáp án (Multiple Choice)
 2. Trắc nghiệm nhiều đáp án (Checkbox)
 3. Tự luận (Essay)
@@ -60,7 +60,7 @@ def get_prompt(content):
   "Question": "Cho phương trình $x^2 + 2x - 3 = 0$. Nghiệm của phương trình là:",
   "options": ["$x = 1$ hoặc $x = -3$", "$x = -1$ hoặc $x = 3$", "$x = 2$ hoặc $x = -1$", "$x = 0$ hoặc $x = 3$"],
   "answer": "1",
-  "image1": "image1.png",
+  "image": "image1.png",
   "explanation": "Giải phương trình bậc 2"
 }
 ```
@@ -74,6 +74,7 @@ def get_prompt(content):
   "options": ["$HCl$", "$NaOH$", "$H_2SO_4$", "$NH_3$"],
   "answers": [1, 3],
   "explanation": "$HCl$ và $H_2SO_4$ là các axit"
+  "image": "image1.png",
 }
 ```
 ---
@@ -173,7 +174,7 @@ def get_prompt(content):
    * `Matching multi-answer`: Khi mỗi mục có thể nối với nhiều đáp án, hoặc hai cột có số lượng phần tử không bằng nhau
    **Không được nhầm giữa hai dạng này.**
 9. **TUYỆT ĐỐI KHÔNG ĐƯỢC BỎ SÓT BÀI NÀO trong phần tài liệu tôi gửi**
-   → Nếu trong ảnh có bài tập thì phải trích xuất được đúng toàn bộ bài tập. Không được phép bỏ sót bất kỳ bài nào
+   → Chỉ trích xuất bài tập chánh trích xuất nội dung không phải câu hỏi
 10. Sửa lỗi chính tả trong nội dung câu hỏi, đáp án nếu có.
 11. Nếu bài tập có chứa ảnh được nhúng trong Markdown bằng cú pháp `![](url hoặc data:image...)`:
     * Trích xuất chính xác nội dung trong ngoặc tròn (URL hoặc chuỗi base64).
@@ -183,14 +184,11 @@ def get_prompt(content):
 """
 
 def fix_json_with_gemini(broken_json_string):
-    """
-    Gọi Gemini API để sửa JSON bị lỗi
-    """
     from dotenv import load_dotenv
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
     
     fix_prompt = f"""
     Bạn là chuyên gia sửa lỗi JSON.
@@ -221,12 +219,10 @@ def fix_json_with_gemini(broken_json_string):
             result_text = part.text
             print("Gemini fix JSON response:", result_text[:200] + "...")
             
-            # Tìm JSON trong response
             match = re.search(r"```json\s*([\s\S]+?)\s*```", result_text)
             if match:
                 fixed_json_string = match.group(1)
             else:
-                # Loại bỏ mọi dấu ``` và khoảng trắng
                 fixed_json_string = result_text.replace('```json', '').replace('```', '').strip()
             
             return fixed_json_string
@@ -254,10 +250,8 @@ def markdownToJson(content):
             if match:
                 json_string = match.group(1)
             else:
-                # Loại bỏ mọi dấu ``` và khoảng trắng
                 json_string = result_text.replace('```json', '').replace('```', '').strip()
             
-            # Thử parse JSON
             try:
                 json_string = json_string.replace('“', '"').replace('”', '"').replace("’", "'")
                 return json.loads(json_string)
@@ -277,18 +271,18 @@ def markdownToJson(content):
                         try:
                             json_string = json_string.replace('“', '"').replace('”', '"').replace("’", "'")
                             fixed_data = json.loads(fixed_json_string)
-                            print(f"✅ Đã sửa JSON thành công sau {fix_attempt} lần thử!")
+                            print(f"Đã sửa JSON thành công sau {fix_attempt} lần thử!")
                             return fixed_data
                         except json.JSONDecodeError as fix_err:
-                            print(f"❌ Lần fix {fix_attempt} vẫn lỗi: {fix_err}")
+                            print(f"Lần fix {fix_attempt} vẫn lỗi: {fix_err}")
                             if fix_attempt < max_fix_attempts:
-                                print(f"🔄 Thử fix lại lần {fix_attempt + 1}...")
+                                print(f"Thử fix lại lần {fix_attempt + 1}...")
                                 current_json_string = fixed_json_string +"Lỗi được thông báo:"+ str(fix_err)  # Dùng JSON đã fix làm input cho lần tiếp theo
                             else:
-                                print(f"❌ Đã thử fix {max_fix_attempts} lần nhưng vẫn lỗi")
+                                print(f"Đã thử fix {max_fix_attempts} lần nhưng vẫn lỗi")
                                 return []
                     else:
-                        print(f"❌ Không thể sửa JSON ở lần {fix_attempt}")
+                        print(f"Không thể sửa JSON ở lần {fix_attempt}")
                         return []
                 
                 return []

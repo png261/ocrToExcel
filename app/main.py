@@ -19,7 +19,7 @@ OUTPUT_DIR = Path("output"); OUTPUT_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="File to Excel API", description="API chuyển đổi file PDF/Images thành file Excel")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-
+import re
 @app.post("/to_excel")
 async def file_to_excel(file: UploadFile = File(...)):
     name = Path(file.filename).stem
@@ -44,11 +44,32 @@ async def file_to_excel(file: UploadFile = File(...)):
 
         md_content, images = result.get("md_content"), result.get("images", {})
         image_urls_map = await s3.upload_images(images)
+        # print("md_content:", md_content)
+        # print("result:", result)
+        parts = re.split(r'(?=^#+\s)', md_content, flags=re.MULTILINE)
 
-        # 2️⃣ Markdown -> Excel
-        data = gemini.markdownToJson(md_content)
-        if not data: raise HTTPException(422, "Không thể xử lý nội dung file Markdown")
+        # Xoá chuỗi rỗng hoặc khoảng trắng dư thừa
+        parts = [p.strip() for p in parts if p.strip()]
 
+        print("md_content:", parts)
+        print("parts:", len(parts))
+        # for i in parts:
+        #     data = gemini.markdownToJson(i)
+        #     if not data: raise HTTPException(422, "Không thể xử lý nội dung file Markdown")
+        #     print("data:", data)
+        data = []
+        for idx, part in enumerate(parts):
+            try:
+                print(f"Processing chunk {idx+1}/{len(parts)}...")
+                chunk_data = gemini.markdownToJson(part) 
+                if isinstance(chunk_data, list):
+                    data.extend(chunk_data)  
+                else:
+                    print(f"Cảnh báo: chunk {idx} không phải list → bỏ qua")
+            except Exception as e:
+                print(f"Lỗi xử lý chunk {idx}: {e}")
+
+        print("Data full:", data)
         output_filename = f"{name}_{uuid.uuid4().hex[:8]}.xlsx"
         output_path = OUTPUT_DIR / output_filename
         excel.toExcel(data, image_urls_map, output_path)
