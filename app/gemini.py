@@ -191,7 +191,7 @@ def fix_json_with_gemini(broken_json_string):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     fix_prompt = f"""
     Bạn là chuyên gia sửa lỗi JSON.
@@ -243,7 +243,7 @@ def call_gemini_api(content):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     prompt = get_prompt(content)
     response = model.generate_content(prompt)
     try:
