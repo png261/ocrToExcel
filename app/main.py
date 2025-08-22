@@ -46,8 +46,30 @@ async def file_to_excel(file: UploadFile = File(...)):
         image_urls_map = await s3.upload_images(images)
         # print("md_content:", md_content)
         # print("result:", result)
-        parts = re.split(r'(?=^#+\s)', md_content, flags=re.MULTILINE)
 
+        import re
+
+        def split_md_by_paragraphs(md_content, max_lines=300):
+            # Tách đoạn theo "\n\n" trở lên
+            paragraphs = re.split(r'\n\s*\n', md_content)
+
+            chunks, buf, line_count = [], [], 0
+            for para in paragraphs:
+                lines = para.splitlines(keepends=True)
+                if line_count + len(lines) > max_lines and buf:
+                    # Khi đủ ngưỡng thì flush chunk
+                    chunks.append("\n\n".join(buf).strip())
+                    buf, line_count = [], 0
+                buf.append(para)
+                line_count += len(lines)
+
+            if buf:
+                chunks.append("\n\n".join(buf).strip())
+
+            return chunks
+
+        # parts = re.split(r'(?=^#+\s)', md_content, flags=re.MULTILINE)
+        parts = split_md_by_paragraphs(md_content, max_lines=50)
         # Xoá chuỗi rỗng hoặc khoảng trắng dư thừa
         parts = [p.strip() for p in parts if p.strip()]
 
