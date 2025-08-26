@@ -95,7 +95,7 @@ def toExcel(data, image_urls_map=None, output_path="CÁCH MẠNG CÔNG NGHIỆP(
                     row[f"Lựa chọn {i}"] = "lỗi không lấy được đáp án"
             else:
                 for i, opt in enumerate(options):
-                    if opt:
+                    if opt and opt != "":
                         row[f"Lựa chọn {i+1}"] = opt
                     else:
                         for j in range(i+1, 5):
@@ -121,7 +121,7 @@ def toExcel(data, image_urls_map=None, output_path="CÁCH MẠNG CÔNG NGHIỆP(
                     row[f"Lựa chọn {i}"] = "lỗi không lấy được đáp án"
             else:
                 for i, opt in enumerate(options):
-                    if opt:
+                    if opt and opt != "":
                         row[f"Lựa chọn {i+1}"] = opt
                     else:
                         for j in range(i+1, 5):

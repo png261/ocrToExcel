@@ -49,32 +49,30 @@ async def file_to_excel(file: UploadFile = File(...)):
 
         import re
 
-        def split_md_by_paragraphs(md_content, max_lines=300):
-            # Tách đoạn theo "\n\n" trở lên
-            paragraphs = re.split(r'\n\s*\n', md_content)
+        def split_by_cau_or_question(md_content, max_lines=300):
+            questions = re.split(r'(?=^(?:Câu|Cau|Question)\s+\d+)', md_content, flags=re.MULTILINE)
+            questions = [q.strip() for q in questions if q.strip()]
 
             chunks, buf, line_count = [], [], 0
-            for para in paragraphs:
-                lines = para.splitlines(keepends=True)
-                if line_count + len(lines) > max_lines and buf:
-                    # Khi đủ ngưỡng thì flush chunk
-                    chunks.append("\n\n".join(buf).strip())
+            for q in questions:
+                q_lines = q.splitlines()
+                if line_count + len(q_lines) > max_lines and buf:
+                    chunks.append("\n".join(buf).strip())
                     buf, line_count = [], 0
-                buf.append(para)
-                line_count += len(lines)
+                buf.append(q)
+                line_count += len(q_lines)
 
             if buf:
-                chunks.append("\n\n".join(buf).strip())
+                chunks.append("\n".join(buf).strip())
 
             return chunks
 
-        # parts = re.split(r'(?=^#+\s)', md_content, flags=re.MULTILINE)
-        parts = split_md_by_paragraphs(md_content, max_lines=50)
-        # Xoá chuỗi rỗng hoặc khoảng trắng dư thừa
-        parts = [p.strip() for p in parts if p.strip()]
 
-        print("md_content:", parts)
-        print("parts:", len(parts))
+        parts = split_by_cau_or_question(md_content, max_lines=120)
+        print("parts:", parts)
+        print("len parts:", len(parts))
+
+
         # for i in parts:
         #     data = gemini.markdownToJson(i)
         #     if not data: raise HTTPException(422, "Không thể xử lý nội dung file Markdown")
