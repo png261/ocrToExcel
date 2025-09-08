@@ -3,23 +3,32 @@ import os, uuid, requests, base64, asyncio
 from dotenv import load_dotenv
 
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import re
 
 import gemini
 import excel 
 import s3
+import save
+import md_to_json
 
 load_dotenv()
 
+PARALLEL_WORKERS = 8
+MAX_LINES_PER_CHUNK = 60 
 
 PARSE_URL = os.getenv("PARSE_URL")
 OUTPUT_DIR = Path("output"); OUTPUT_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="File to Excel API", description="API chuyển đổi file PDF/Images thành file Excel")
+app = FastAPI(title="File to Excel API", description="API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-import re
+
+class MarkdownRequest(BaseModel):
+    markdown_text: str
+
 @app.post("/to_excel")
 async def file_to_excel(file: UploadFile = File(...)):
     name = Path(file.filename).stem
@@ -28,7 +37,6 @@ async def file_to_excel(file: UploadFile = File(...)):
         raise HTTPException(422, "Chỉ hỗ trợ PDF và các định dạng ảnh PNG, JPG, JPEG")
 
     try:
-        # 1️⃣ Send file to parse service
         res = requests.post(
             PARSE_URL,
             files={"files": (file.filename, file.file, file.content_type)},
@@ -44,61 +52,94 @@ async def file_to_excel(file: UploadFile = File(...)):
 
         md_content, images = result.get("md_content"), result.get("images", {})
         image_urls_map = await s3.upload_images(images)
-        # print("md_content:", md_content)
-        # print("result:", result)
+        md_content = re.sub(
+            r'!\[\]\(images/', 
+            '![ ](https://static-ai.hoclieu.vn/pdftoexcel/', 
+            md_content
+        )
 
-        import re
-
-        def split_by_cau_or_question(md_content, max_lines=300):
-            questions = re.split(r'(?=^(?:Câu|Cau|Question)\s+\d+)', md_content, flags=re.MULTILINE)
-            questions = [q.strip() for q in questions if q.strip()]
-
-            chunks, buf, line_count = [], [], 0
-            for q in questions:
-                q_lines = q.splitlines()
-                if line_count + len(q_lines) > max_lines and buf:
-                    chunks.append("\n".join(buf).strip())
-                    buf, line_count = [], 0
-                buf.append(q)
-                line_count += len(q_lines)
-
-            if buf:
-                chunks.append("\n".join(buf).strip())
-
+        def split_by_cau_or_question(md_content: str, max_lines: int = 300):
+            lines = md_content.splitlines()  
+            chunks = []
+            for i in range(0, len(lines), max_lines):
+                chunk = "\n".join(lines[i:i + max_lines]).strip()
+                if chunk:
+                    chunks.append(chunk)
             return chunks
-
-
-        parts = split_by_cau_or_question(md_content, max_lines=120)
-        print("parts:", parts)
+        parts = split_by_cau_or_question(md_content, max_lines=MAX_LINES_PER_CHUNK)
+        print("parts:", len(parts), "chunks")
         print("len parts:", len(parts))
 
+        print(f"Starting parallel processing with {PARALLEL_WORKERS} workers...")
+        chunk_results = await gemini.process_chunks_parallel(parts, max_workers=PARALLEL_WORKERS)
 
-        # for i in parts:
-        #     data = gemini.markdownToJson(i)
-        #     if not data: raise HTTPException(422, "Không thể xử lý nội dung file Markdown")
-        #     print("data:", data)
-        data = []
-        for idx, part in enumerate(parts):
-            try:
-                print(f"Processing chunk {idx+1}/{len(parts)}...")
-                chunk_data = gemini.markdownToJson(part) 
-                if isinstance(chunk_data, list):
-                    data.extend(chunk_data)  
+        data = ""
+        for idx, chunk_data in enumerate(chunk_results):
+            if chunk_data and chunk_data.strip():
+                chunk_lines = chunk_data.count('\n') + 1
+                if data:
+                    data = data + "\n\n" + chunk_data
                 else:
-                    print(f"Cảnh báo: chunk {idx} không phải list → bỏ qua")
-            except Exception as e:
-                print(f"Lỗi xử lý chunk {idx}: {e}")
+                    data = chunk_data
+                print(f"Added chunk {idx+1} ({chunk_lines} lines), total length: {len(data)}")
+            else:
+                print(f"Skipped empty chunk {idx+1}")
+        
+        print(f"Parallel processing completed! Total chunks: {len(parts)}")
+        with open("output_cleaned.md", "w", encoding="utf-8") as f:
+            f.write(data)
+        print("Data full length:", len(data))
+        print("Data preview:", data[:300] + "..." if len(data) > 300 else data)
 
-        print("Data full:", data)
-        output_filename = f"{name}_{uuid.uuid4().hex[:8]}.xlsx"
-        output_path = OUTPUT_DIR / output_filename
-        excel.toExcel(data, image_urls_map, output_path)
-        if not output_path.exists(): raise HTTPException(500, "Lỗi khi tạo file Excel")
-
-        return FileResponse(output_path, filename=output_filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        return {"data": data, "total_chunks": len(parts), "data_length": len(data)}
 
     except Exception as e:
         raise HTTPException(500, f"Lỗi server: {e}")
+
+@app.post("/save")
+async def markdown_to_excel(request: MarkdownRequest):
+    try:
+        markdown_text = request.markdown_text
+        
+        if not markdown_text.strip():
+            raise HTTPException(400, "Markdown text không được để trống")
+        
+        filename = "output.xlsx"
+        output_path = OUTPUT_DIR / filename        
+        excel_path = save.markdown_to_excel(markdown_text, str(output_path))
+        if not Path(excel_path).exists():
+            raise HTTPException(500, "Không thể tạo file Excel")
+        
+        return FileResponse(
+            path=excel_path,
+            filename=filename,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Lỗi khi chuyển đổi markdown sang Excel: {e}")
+    
+@app.post("/to_json")
+async def markdown_to_json_endpoint(request: MarkdownRequest):
+    try:
+        markdown_text = request.markdown_text
+        if not markdown_text.strip():
+            raise HTTPException(400, "Markdown text không được để trống")
+        json_data = md_to_json.markdown_to_json(markdown_text)
+        
+        return {
+            "success": True,
+            "data": json_data,
+            "total_questions": len(json_data)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Lỗi khi chuyển đổi markdown sang JSON: {e}")
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug")

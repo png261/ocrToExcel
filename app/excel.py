@@ -156,6 +156,10 @@ def toExcel(data, image_urls_map=None, output_path="CÁCH MẠNG CÔNG NGHIỆP(
             
             for i, item_text in enumerate(item.get("items", [])):
                 row[f"Lựa chọn {i+1}"] = item_text
+            
+            # Hiển thị đáp án trong cột "Đáp án"
+            if "answer" in item:
+                row["Đáp án"] = item["answer"]
 
         elif qtype == "Matching 1 answer" or qtype == "Matching multi-answer":
             if len(item.get("right", [])) == len(item.get("left", [])):
