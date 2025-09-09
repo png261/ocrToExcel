@@ -14,6 +14,7 @@ import excel
 import s3
 import save
 import md_to_json
+import gen_qa
 
 load_dotenv()
 
@@ -139,6 +140,76 @@ async def markdown_to_json_endpoint(request: MarkdownRequest):
         raise
     except Exception as e:
         raise HTTPException(500, f"Lỗi khi chuyển đổi markdown sang JSON: {e}")
+
+@app.post("/api/v1/book-embedding/generate-question")
+def generateQuestionBy9Anh(request: gen_qa.generateQuestionBy9Anh):
+    
+    content = gen_qa.find_content_by_topic(request.grade, request.subject, request.topic)
+    response_data = {
+        "name": f"{request.subject} - Grade {request.grade} - {', '.join(request.topic) if request.topic else 'General'}",
+        "questions": []
+    }
+    
+    questions = gen_qa.genqa(
+        amount=request.amount,
+        grade=request.grade,
+        note=request.note,
+        questionType=request.questionType,
+        subject=request.subject,
+        topic=request.topic,
+        content=content
+    )
+    
+    response_data["questions"] = questions
+    
+    return response_data
+
+@app.post("/api/v1/marker/generate-question")
+def generateQuestionBy9AnhWithTopic(request: gen_qa.generateQuestionBy9AnhWithTopic1):
+
+    print(f"Received request: {request}")
+    response_data = {
+        "name": f"{request.subject} - Grade {request.grade}",
+        "questions": []
+    }
+    
+    print(f"Request details: amount={request.amount}, grade={request.grade}, document={request.document},questionType={request.questionType}, subject={request.subject}")
+    # print(f"Note: {request.note if request.note else 'No note provided'}")
+    questions = gen_qa.genqa_with_doc(
+        amount=request.amount,
+        grade=request.grade,
+        questionType=request.questionType,
+        subject=request.subject,
+        document = request.document
+    )
+    
+    response_data["questions"] = questions
+    
+    return response_data
+
+@app.post("/api/v1/marker/generate-derivative-question-advanced")
+def generateDerivativeQuestion(request: gen_qa.GenerateDerivativeQuestionRequest):
+    
+    print(f"Received derivative question request: {request}")
+    response_data = {
+        "name": f"{request.subject} - Grade {request.grade}",
+        "questions": []
+    }
+    
+    print(f"Request details: amount={request.amount}, grade={request.grade}, note={request.note}, originalQuestion={request.originalQuestion[:100]}..., questionType={request.questionType}, subject={request.subject}")
+    
+    questions = gen_qa.genqa_derivative(
+        amount=request.amount,
+        grade=request.grade,
+        note=request.note,
+        originalQuestion=request.originalQuestion,
+        questionType=request.questionType,
+        subject=request.subject
+    )
+    
+    response_data["questions"] = questions
+    
+    return response_data
 
 
 if __name__ == "__main__":
