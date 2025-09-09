@@ -8,10 +8,13 @@ from pydantic import BaseModel
 
 import os
 import re
-from google import genai
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
 app = FastAPI()
 GENMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyAk6nXa0WJpsSTKjYCf4-7Gzm4AJtinamc')
-client = genai.Client(api_key=GENMINI_API_KEY)
+genai.configure(api_key=GENMINI_API_KEY)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -275,11 +278,16 @@ Chỉ trả về JSON array, không có text giải thích thêm.
         try:
             print(f"Attempt {retry_count + 1}/{max_retries}")
             
-            # Call Gemini API
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[prompt]
-            )
+            # Cấu hình safety settings để giảm việc bị block
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(prompt, safety_settings=safety_settings)
             # print((f"Response: {response.text}"))
             if response and hasattr(response, 'text'):
                 response_text = response.text.strip()
@@ -365,11 +373,16 @@ def genqa_with_doc(amount, grade, questionType, subject, document):
         try:
             print(f"Attempt {retry_count + 1}/{max_retries}")
             
-            # Call Gemini API
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[prompt]
-            )
+            # Cấu hình safety settings để giảm việc bị block
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(prompt, safety_settings=safety_settings)
             # print((f"Response: {response.text}"))
             if response and hasattr(response, 'text'):
                 response_text = response.text.strip()
@@ -466,11 +479,16 @@ Chỉ trả về JSON array, không có text giải thích thêm.
         try:
             print(f"Attempt {retry_count + 1}/{max_retries}")
             
-            # Call Gemini API
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[prompt]
-            )
+            # Cấu hình safety settings để giảm việc bị block
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(prompt, safety_settings=safety_settings)
             
             if response and hasattr(response, 'text'):
                 response_text = response.text.strip()

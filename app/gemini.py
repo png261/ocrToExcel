@@ -67,6 +67,7 @@ Câu 8. Sắp xếp
 10. **Quan trọng nhất** Chỉ lấy nhưng câu là câu hỏi thôi nếu không phải câu hỏi thì bỏ qua
 11. **Nếu câu hỏi tự luận có nhiều ý thì ý con sẽ bắt đầu bằng a);b)...**
 12. **Nếu dạng nối nhiều đáp án thì dùng :: để phân cách**
+13. ** Lưu ý không cho katex vào nháy ``.
 """
 
 
