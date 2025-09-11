@@ -59,8 +59,8 @@ Câu 8. Sắp xếp
 2. **Công thức toán/lý/hóa**: Dùng LaTeX với `$...$` (inline) hoặc `$$...$$` (display)
 3. **Format câu hỏi**: Câu 1., Câu 2., ...
 4. **Đáp án đúng**: Thêm dấu * phía trước
-5. **Lựa chọn của trắc nghiệm một hoặc nhiều đáp án**: A., B., C., D. 
-6. **Dạng đúng sai có dạng: *Đúng (Nội dung đáp án) hoặc *Sai (Nội dung đáp án) hoặc **Không xác định (Nội dung đáp án)**
+5. **Lựa chọn của trắc nghiệm một hoặc nhiều đáp án**: A., B., C., D. Nhớ phải có dấu * trước đáp án đúng
+6. **Dạng đúng sai có dạng: *Đúng (Nội dung đáp án) hoặc *Sai (Nội dung đáp án). Một câu hỏi luôn phải có 1 trong 2 thành phần này**
 7. **Ảnh**: ![](url)
 8. **Không bỏ sót câu nào**
 9. **Sửa lỗi chính tả** nhưng giữ nguyên nội dung

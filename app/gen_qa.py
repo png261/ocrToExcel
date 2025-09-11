@@ -251,7 +251,7 @@ QUAN TRỌNG: Trả về kết quả CHÍNH XÁC theo định dạng JSON sau đ
     "level": "intermediate"
   }},
   {{
-    "question": "Câu hỏi fill-in ở đây với _____ chỗ trống",
+    "question": "Câu hỏi fill-in ở đây với ____ chỗ trống",
     "type": "fill-in", 
     "correct_answers": ["từ điền vào"],
     "incorrect_answers": [],
@@ -452,7 +452,7 @@ QUAN TRỌNG: Trả về kết quả CHÍNH XÁC theo định dạng JSON sau đ
     "level": "intermediate"
   }},
   {{
-    "question": "Câu hỏi fill-in ở đây với _____ chỗ trống",
+    "question": "Câu hỏi fill-in ở đây với ____ chỗ trống",
     "type": "fill-in", 
     "correct_answers": ["từ điền vào"],
     "incorrect_answers": [],
